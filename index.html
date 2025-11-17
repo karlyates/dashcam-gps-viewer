@@ -239,8 +239,14 @@
       if (marker) {
         map.removeLayer(marker);
       }
-      marker = L.circleMarker(latlngs[0], { radius: 6 }).addTo(map);
-
+      marker = L.circleMarker(latlngs[0], {
+        radius: 6,
+        color: 'red',
+        fillColor: 'red',
+        fillOpacity: 0.9,
+        weight: 2
+      }).addTo(map);
+      
       slider.max = points.length - 1;
       slider.value = 0;
       enableControls(true);

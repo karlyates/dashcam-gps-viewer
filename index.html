@@ -1,365 +1,80 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashcam GPS Viewer</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
-  />
-  <style>
-    html, body { height: 100%; margin: 0; padding: 0; }
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
-    #map { height: calc(100% - 120px); width: 100%; }
-    #controls {
-      padding: 8px 12px;
-      background: #f5f5f5;
-      border-top: 1px solid #ddd;
-      box-sizing: border-box;
-    }
-    #topRow {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-      flex-wrap: wrap;
-    }
-    #fileName {
-      font-size: 0.9rem;
-      color: #555;
-    }
-    #timeLabel { font-weight: 600; }
-    #meta {
-      font-size: 0.85rem;
-      color: #555;
-      margin-top: 4px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    input[type="range"] {
-      width: 100%;
-    }
-    button {
-      margin-right: 4px;
-      padding: 4px 10px;
-      font-size: 0.9rem;
-      cursor: pointer;
-    }
-    #status {
-      font-size: 0.8rem;
-      color: #777;
-      margin-left: auto;
-    }
-    /* Drag-and-drop overlay */
-    #dropOverlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.45);
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.3rem;
-      font-weight: 600;
-      z-index: 1000;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.15s ease-out;
-    }
-    #dropOverlay.visible {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    #dropOverlay span {
-      padding: 12px 18px;
-      border: 2px dashed #fff;
-      border-radius: 8px;
-      background: rgba(0, 0, 0, 0.35);
-    }
-  </style>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
+
   <div id="map"></div>
+
   <div id="controls">
-    <div id="topRow">
-      <button id="openBtn">Open .dat file</button>
-      <button id="playBtn" disabled>Play</button>
-      <button id="pauseBtn" disabled>Pause</button>
-      <span id="fileName">No file loaded</span>
-      <span id="status"></span>
+    <div class="controls-header">
+      <div class="button-group">
+        <button id="openBtn">Open DAT File</button>
+        <button id="playBtn">Play</button>
+        <button id="pauseBtn">Pause</button>
+      </div>
+
+      <div class="file-info">
+        <div id="fileName">No file loaded</div>
+        <div id="status">Ready</div>
+      </div>
     </div>
-    <div><strong>Time:</strong> <span id="timeLabel">n/a</span></div>
-    <div id="meta">Lat: -, Lng: - | Speed: - | Alt: -</div>
-    <div style="margin-top: 6px;">
-      <input type="range" id="timeSlider" min="0" max="0" value="0" step="1" disabled />
+
+    <div class="slider-container">
+      <input type="range" id="timeSlider" min="0" max="100" value="0" disabled>
+    </div>
+
+    <div class="meta-grid">
+      <div class="meta-item">
+        <span class="meta-label">Time</span>
+        <span class="meta-value" id="meta-time">-</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Latitude</span>
+        <span class="meta-value" id="meta-lat">-</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Longitude</span>
+        <span class="meta-value" id="meta-lng">-</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Speed</span>
+        <span class="meta-value" id="meta-speed">-</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Altitude</span>
+        <span class="meta-value" id="meta-alt">-</span>
+      </div>
     </div>
   </div>
 
-  <div id="dropOverlay"><span>Drop a .dat file anywhere to load</span></div>
+  <div id="dropOverlay">
+    <div class="drop-content">
+      Drop .dat file here
+    </div>
+  </div>
 
-  <input type="file" id="fileInput" accept=".dat,text/plain" style="display:none" />
+  <input type="file" id="fileInput" accept=".dat,.txt" style="display: none;">
 
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
-  <script>
-    // Basic Leaflet map setup
-    const map = L.map('map').setView([0, 0], 2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-    let trackLine = null;
-    let marker = null;
-    let points = [];
-    let playTimer = null;
-
-    const openBtn = document.getElementById('openBtn');
-    const playBtn = document.getElementById('playBtn');
-    const pauseBtn = document.getElementById('pauseBtn');
-    const fileInput = document.getElementById('fileInput');
-    const fileNameEl = document.getElementById('fileName');
-    const statusEl = document.getElementById('status');
-    const timeLabel = document.getElementById('timeLabel');
-    const meta = document.getElementById('meta');
-    const slider = document.getElementById('timeSlider');
-    const dropOverlay = document.getElementById('dropOverlay');
-
-    function setStatus(msg) {
-      statusEl.textContent = msg || '';
-    }
-
-    function enableControls(enabled) {
-      slider.disabled = !enabled;
-      playBtn.disabled = !enabled;
-      pauseBtn.disabled = !enabled;
-    }
-
-    function parseTimestamp(ts) {
-      if (!/^\d{14}$/.test(ts)) return ts;
-      const y = ts.slice(0,4);
-      const m = ts.slice(4,6);
-      const d = ts.slice(6,8);
-      const hh = ts.slice(8,10);
-      const mm = ts.slice(10,12);
-      const ss = ts.slice(12,14);
-      return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
-    }
-
-    function parseDatText(text) {
-      const lines = text.split(/\r?\n/);
-      const parsed = [];
-      for (const raw of lines) {
-        const line = raw.trim();
-        if (!line || line.startsWith('#')) continue;
-        const parts = line.split(',');
-        if (parts.length < 5) continue;
-
-        const tsRaw = parts[0];
-        const timeHuman = parseTimestamp(tsRaw);
-
-        const latVal = parseFloat(parts[1]);
-        const latDir = (parts[2] || '').trim().toUpperCase();
-        const lonVal = parseFloat(parts[3]);
-        const lonDir = (parts[4] || '').trim().toUpperCase();
-
-        if (isNaN(latVal) || isNaN(lonVal)) continue;
-
-        let lat = latVal;
-        let lng = lonVal;
-        if (latDir === 'S') lat = -lat;
-        if (lonDir === 'W') lng = -lng;
-
-        let speed = null;
-        let alt = null;
-        if (parts.length > 5) {
-          const s = parseFloat(parts[5]);
-          if (!isNaN(s)) speed = s;
-        }
-        if (parts.length > 6) {
-          const a = parseFloat(parts[6]);
-          if (!isNaN(a)) alt = a;
-        }
-
-        parsed.push({
-          ts: tsRaw,
-          time: timeHuman,
-          lat,
-          lng,
-          speed,
-          alt
-        });
-      }
-      return parsed;
-    }
-
-    function formatMeta(p) {
-      const speed = (p.speed !== null && p.speed !== undefined)
-        ? p.speed.toFixed(2)
-        : 'n/a';
-      const alt = (p.alt !== null && p.alt !== undefined)
-        ? p.alt.toFixed(1)
-        : 'n/a';
-      return `Lat: ${p.lat.toFixed(6)}, Lng: ${p.lng.toFixed(6)} | Speed: ${speed} | Alt: ${alt}`;
-    }
-
-    function updateMarker(idx) {
-      if (!points.length) return;
-      if (idx < 0 || idx >= points.length) return;
-      const p = points[idx];
-
-      marker.setLatLng([p.lat, p.lng]);
-      timeLabel.textContent = p.time + ` (point ${idx + 1} of ${points.length})`;
-      meta.textContent = formatMeta(p);
-    }
-
-    function loadTrackFromText(text) {
-      setStatus('Parsing file...');
-      points = parseDatText(text);
-      if (!points.length) {
-        setStatus('No valid points found.');
-        enableControls(false);
-        return;
-      }
-
-      const latlngs = points.map(p => [p.lat, p.lng]);
-      if (trackLine) {
-        map.removeLayer(trackLine);
-      }
-      trackLine = L.polyline(latlngs, { weight: 4 }).addTo(map);
-      map.fitBounds(trackLine.getBounds(), { padding: [20, 20] });
-
-      if (marker) {
-        map.removeLayer(marker);
-      }
-      marker = L.circleMarker(latlngs[0], {
-        radius: 6,
-        color: 'red',
-        fillColor: 'red',
-        fillOpacity: 0.9,
-        weight: 2
-      }).addTo(map);
-      
-      slider.max = points.length - 1;
-      slider.value = 0;
-      enableControls(true);
-      updateMarker(0);
-      setStatus(`Loaded ${points.length} points.`);
-    }
-
-    function handleFile(file) {
-      if (!file) return;
-      fileNameEl.textContent = file.name;
-      setStatus('Reading file...');
-
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        loadTrackFromText(evt.target.result);
-      };
-      reader.onerror = () => {
-        setStatus('Error reading file.');
-      };
-      reader.readAsText(file);
-    }
-
-    // "Open .dat file" button
-    openBtn.addEventListener('click', () => {
-      fileInput.value = '';
-      fileInput.click();
-    });
-
-    // File input change
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
-      handleFile(file);
-    });
-
-    // Slider scrub
-    slider.addEventListener('input', (e) => {
-      const idx = parseInt(e.target.value, 10);
-      updateMarker(idx);
-    });
-
-    // Play / pause
-    function play() {
-      if (!points.length) return;
-      if (playTimer !== null) return;
-      playTimer = setInterval(() => {
-        let idx = parseInt(slider.value, 10);
-        if (idx >= points.length - 1) {
-          clearInterval(playTimer);
-          playTimer = null;
-          setStatus('Reached end of track.');
-          return;
-        }
-        slider.value = idx + 1;
-        updateMarker(idx + 1);
-      }, 100);
-      setStatus('Playing...');
-    }
-
-    function pause() {
-      if (playTimer !== null) {
-        clearInterval(playTimer);
-        playTimer = null;
-        setStatus('Paused.');
-      }
-    }
-
-    playBtn.addEventListener('click', play);
-    pauseBtn.addEventListener('click', pause);
-
-    // ---- Drag & drop support ----
-    let dragDepth = 0;
-
-    function showOverlay() {
-      dropOverlay.classList.add('visible');
-    }
-
-    function hideOverlay() {
-      dropOverlay.classList.remove('visible');
-    }
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-      window.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dragDepth++;
-        showOverlay();
-      });
-    });
-
-    ['dragleave', 'dragend'].forEach(eventName => {
-      window.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dragDepth = Math.max(0, dragDepth - 1);
-        if (dragDepth === 0) hideOverlay();
-      });
-    });
-
-    window.addEventListener('drop', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dragDepth = 0;
-      hideOverlay();
-
-      const dt = e.dataTransfer;
-      if (!dt || !dt.files || !dt.files.length) return;
-      const file = dt.files[0];
-      handleFile(file);
-    });
-
-    // Initial state
-    enableControls(false);
-    setStatus('Ready. Click "Open .dat file" or drag and drop a .dat file.');
-  </script>
+  <!-- App JS -->
+  <script src="js/parser.js"></script>
+  <script src="js/app.js"></script>
 </body>
+
 </html>
